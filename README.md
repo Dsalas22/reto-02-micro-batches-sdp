@@ -16,6 +16,7 @@ Tras el primer lote hay 3 eventos; tras agregar el segundo, 5; y después de eje
 - Workspace de Databricks con Unity Catalog, Lakeflow pipelines, Auto Loader y cómputo compatible.
 - Catálogo y esquema propios o asignados; permisos para usarlos, crear streaming tables y volúmenes, leer/escribir en el volumen y ejecutar el pipeline. Crear el catálogo requiere permisos adicionales; puede prepararlo el administrador.
 - Acceso a SQL Editor o notebook. El cómputo y almacenamiento pueden generar costos.
+- Permisos para crear y ejecutar Lakeflow Jobs y escribir en el volumen con la identidad que ejecuta el Job.
 - Haber completado el reto 1 o comprender streaming tables y ejecución triggered.
 
 ## Identificación por participante
@@ -25,6 +26,17 @@ Forma un sufijo con la primera letra del nombre y de cada uno de los dos apellid
 Todos los ejemplos usan `dsh`: sustitúyelo por tu sufijo en **cada** nombre, consulta y ruta. El catálogo `retos_sdp_dsh` es personal y puede usarse en los tres retos; el esquema `reto02_dsh`, el volumen, la carpeta y el pipeline son específicos de este reto. La separación por nombres no reemplaza permisos de Unity Catalog ni protege frente al acceso de otros usuarios.
 
 Los pipelines existentes con nombres anteriores no se migran automáticamente: crea un pipeline nuevo con sus recursos propios; no cambies el sufijo en un pipeline compartido o ya ejecutado.
+
+## Datos ficticios y Job
+
+Los campos `persona_id` y `persona_alias` son identificadores y etiquetas inventados, como `DUMMY-ID-001` y `DUMMY_UCRANIA`; los nombres de países son solo alias, no representan personas reales. No se usan documentos, correos, direcciones ni otros datos personales reales. No cargues información real en este laboratorio.
+
+1. Importa `ingesta/generador.py` como notebook de Databricks o selecciónalo desde una Git folder.
+2. En **Jobs & Pipelines**, crea el Job `job_ingesta_reto02_dsh` con una tarea **Notebook** que apunte al generador y use cómputo compatible.
+3. En los **parámetros del Job** configura `sufijo = dsh` y `lote = lote_01`, sustituyendo `dsh` por tu sufijo. No dupliques estos parámetros en la tarea. Guarda el Job sin programación, con concurrencia máxima de una ejecución.
+4. Después de crear el volumen del paso 1, ejecuta **Run now** y espera a que termine correctamente. Para el segundo lote, usa **Run now with different parameters** y cambia únicamente `lote` a `lote_02`. Cada lote fijo se escribe una sola vez: si el archivo ya existe, el Job falla sin sobrescribirlo.
+
+Los archivos de `datos/` son muestras de referencia equivalentes; no los subas si ya usas el Job, para no duplicar la ingesta.
 
 ## Paso a paso
 
@@ -36,13 +48,13 @@ Los pipelines existentes con nombres anteriores no se migran automáticamente: c
    CREATE VOLUME IF NOT EXISTS retos_sdp_dsh.reto02_dsh.volumen_sdp_dsh;
    ```
 
-   Si el catálogo ya fue provisionado, omite la primera sentencia. En Catalog Explorer crea la carpeta vacía `reto02_dsh/entrada_dsh` dentro del volumen. Sube **únicamente** `datos/lote_01.json`. No subas todavía el segundo lote ni la carpeta completa de datos.
+   Si el catálogo ya fue provisionado, omite la primera sentencia. Usa una carpeta de entrada vacía y ejecuta el Job manual con `lote = lote_01`, según la sección anterior. El notebook crea la carpeta y el primer archivo; no ejecutes aún `lote_02`.
 
 2. **Crea el pipeline.** Crea un archivo Python en el workspace con `solucion/pipeline.py` y agrégalo como código fuente a un nuevo pipeline llamado `pipeline_reto02_dsh`. Configura catálogo `retos_sdp_dsh`, esquema `reto02_dsh`, modo **triggered**, y en **Settings → Configuration** las claves `pipelines.suffix = dsh` y `lab.source_path = /Volumes/retos_sdp_dsh/reto02_dsh/volumen_sdp_dsh/reto02_dsh/entrada_dsh`. El código rechaza un sufijo ausente o que no tenga exactamente tres letras.
 
 3. **Primera actualización.** Ejecuta una actualización normal y espera su finalización. Ejecuta las consultas de validación de abajo. Registra el conteo: debe ser 3.
 
-4. **Segundo lote.** Sube `datos/lote_02.json` a la misma carpeta, sin modificar ni volver a subir el primer archivo. Ejecuta otra actualización normal del **mismo pipeline** y espera su finalización. El conteo debe ser 5; los identificadores `e4` y `e5` deben aparecer una vez.
+4. **Segundo lote.** Ejecuta el mismo Job con `lote = lote_02` como se indica arriba. Cuando termine correctamente, ejecuta otra actualización normal del **mismo pipeline** y espera su finalización. El conteo debe ser 5; los identificadores `e4` y `e5` deben aparecer una vez.
 
 5. **Reejecución sin datos nuevos.** Ejecuta una tercera actualización normal, sin subir archivos. El conteo debe seguir siendo 5 y todos los identificadores deben aparecer una vez. Revisa el historial o eventos del pipeline y anota la evidencia disponible.
 
@@ -61,6 +73,17 @@ ORDER BY evento_id;
 
 Resultados: primera ejecución `e1`–`e3`; segunda y tercera `e1`–`e5`, cada uno con `veces = 1`.
 
+Comprueba también los alias ficticios:
+
+```sql
+SELECT evento_id, persona_id, persona_alias
+FROM retos_sdp_dsh.reto02_dsh.vuelos_bronze_dsh ORDER BY evento_id;
+```
+
+## Programación opcional
+
+Después de comprobar **3 → 5 → 5**, crea otro Job `job_programado_reto02_dsh` con el mismo notebook y parámetros del Job `sufijo = dsh`, `lote = continuo`. Cada ejecución genera un evento y archivo nuevos con identificadores ficticios únicos; los conteos de la prueba inicial dejarán de aplicar. Añade una tarea **Pipeline** que dependa de la tarea de ingesta y seleccione `pipeline_reto02_dsh`; usa actualización normal, no full refresh. Configura una programación con concurrencia máxima 1, inicialmente pausada. Actívala solo para la prueba, observa las ejecuciones y vuelve a pausarla. La frecuencia y latencia dependen del entorno y generan costos; reintentar una ejecución puede producir otro evento nuevo.
+
 ## Entregables y evaluación
 
 - Evidencia de las tres ejecuciones y tabla con conteos **3 → 5 → 5**.
@@ -77,3 +100,5 @@ No uses full refresh para la prueba: cambia la semántica del experimento. No so
 - [Conceptos de pipelines](https://docs.databricks.com/aws/en/ldp/concepts)
 - [Tutorial oficial con Auto Loader](https://docs.databricks.com/aws/en/getting-started/data-pipeline-get-started)
 - [Parámetros de configuración](https://docs.databricks.com/aws/en/ldp/parameters)
+- [Tareas notebook en Jobs](https://docs.databricks.com/aws/en/jobs/tasks/notebook)
+- [Tareas pipeline en Jobs](https://docs.databricks.com/aws/en/jobs/tasks/pipeline)
