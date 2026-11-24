@@ -14,23 +14,31 @@ Tras el primer lote hay 3 eventos; tras agregar el segundo, 5; y después de eje
 ## Requisitos
 
 - Workspace de Databricks con Unity Catalog, Lakeflow pipelines, Auto Loader y cómputo compatible.
-- Catálogo y esquema propios o asignados; permisos para usarlos, crear streaming tables y volúmenes, leer/escribir en el volumen y ejecutar el pipeline.
+- Catálogo y esquema propios o asignados; permisos para usarlos, crear streaming tables y volúmenes, leer/escribir en el volumen y ejecutar el pipeline. Crear el catálogo requiere permisos adicionales; puede prepararlo el administrador.
 - Acceso a SQL Editor o notebook. El cómputo y almacenamiento pueden generar costos.
 - Haber completado el reto 1 o comprender streaming tables y ejecución triggered.
 
-Usa un esquema y una carpeta de entrada independientes por participante y por reto: los tres pipelines reutilizan algunos nombres de tabla. Sustituye `CATALOGO` y `ESQUEMA` en los ejemplos.
+## Identificación por participante
+
+Forma un sufijo con la primera letra del nombre y de cada uno de los dos apellidos, en minúsculas y sin tildes; por ejemplo, `dsh`. Usa tres letras ASCII (`a`–`z`). Si dos participantes tienen las mismas iniciales o una persona no puede formar tres letras, el instructor asignará a cada uno un sufijo alternativo de tres letras **único**. Confírmalo antes de crear recursos.
+
+Todos los ejemplos usan `dsh`: sustitúyelo por tu sufijo en **cada** nombre, consulta y ruta. El catálogo `retos_sdp_dsh` es personal y puede usarse en los tres retos; el esquema `reto02_dsh`, el volumen, la carpeta y el pipeline son específicos de este reto. La separación por nombres no reemplaza permisos de Unity Catalog ni protege frente al acceso de otros usuarios.
+
+Los pipelines existentes con nombres anteriores no se migran automáticamente: crea un pipeline nuevo con sus recursos propios; no cambies el sufijo en un pipeline compartido o ya ejecutado.
 
 ## Paso a paso
 
-1. **Prepara una entrada limpia.** En SQL Editor o notebook ejecuta:
+1. **Prepara una entrada limpia.** El administrador crea o asigna el catálogo personal `retos_sdp_dsh`; verifica con él que no esté asignado a otra persona. Si tienes los permisos necesarios, ejecuta en SQL Editor o notebook:
 
    ```sql
-   CREATE VOLUME IF NOT EXISTS CATALOGO.ESQUEMA.retos_sdp;
+   CREATE CATALOG IF NOT EXISTS retos_sdp_dsh;
+   CREATE SCHEMA IF NOT EXISTS retos_sdp_dsh.reto02_dsh;
+   CREATE VOLUME IF NOT EXISTS retos_sdp_dsh.reto02_dsh.volumen_sdp_dsh;
    ```
 
-   En Catalog Explorer crea la carpeta vacía `reto02/entrada` dentro del volumen. Sube **únicamente** `datos/lote_01.json`. No subas todavía el segundo lote ni la carpeta completa de datos.
+   Si el catálogo ya fue provisionado, omite la primera sentencia. En Catalog Explorer crea la carpeta vacía `reto02_dsh/entrada_dsh` dentro del volumen. Sube **únicamente** `datos/lote_01.json`. No subas todavía el segundo lote ni la carpeta completa de datos.
 
-2. **Crea el pipeline.** Crea un archivo Python en el workspace con `solucion/pipeline.py` y agrégalo como código fuente a un nuevo pipeline. Configura catálogo y esquema destino, modo **triggered**, y en **Settings → Configuration** la clave `lab.source_path` con `/Volumes/CATALOGO/ESQUEMA/retos_sdp/reto02/entrada`.
+2. **Crea el pipeline.** Crea un archivo Python en el workspace con `solucion/pipeline.py` y agrégalo como código fuente a un nuevo pipeline llamado `pipeline_reto02_dsh`. Configura catálogo `retos_sdp_dsh`, esquema `reto02_dsh`, modo **triggered**, y en **Settings → Configuration** las claves `pipelines.suffix = dsh` y `lab.source_path = /Volumes/retos_sdp_dsh/reto02_dsh/volumen_sdp_dsh/reto02_dsh/entrada_dsh`. El código rechaza un sufijo ausente o que no tenga exactamente tres letras.
 
 3. **Primera actualización.** Ejecuta una actualización normal y espera su finalización. Ejecuta las consultas de validación de abajo. Registra el conteo: debe ser 3.
 
@@ -43,10 +51,10 @@ Usa un esquema y una carpeta de entrada independientes por participante y por re
 ## Validación SQL
 
 ```sql
-SELECT COUNT(*) AS eventos FROM CATALOGO.ESQUEMA.vuelos_bronze;
+SELECT COUNT(*) AS eventos FROM retos_sdp_dsh.reto02_dsh.vuelos_bronze_dsh;
 
 SELECT evento_id, COUNT(*) AS veces
-FROM CATALOGO.ESQUEMA.vuelos_bronze
+FROM retos_sdp_dsh.reto02_dsh.vuelos_bronze_dsh
 GROUP BY evento_id
 ORDER BY evento_id;
 ```
