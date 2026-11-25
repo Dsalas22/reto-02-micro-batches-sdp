@@ -108,6 +108,21 @@ El límite de 500 es **por ejecución del generador**, no para el total acumulad
 
 No uses full refresh para la prueba: cambia la semántica del experimento. No sobrescribas el primer archivo ni borres checkpoints. Para repetir desde cero, crea un pipeline y una carpeta nuevos. El mismo contenido en archivos distintos puede procesarse más de una vez.
 
+## Videos tutoriales en español
+
+Ruta de estudio sugerida; los videos son material de apoyo, no sustituyen el paso a paso. Las duraciones son aproximadas y no están incluidas en la duración del reto. Enlaces y disponibilidad revisados el **25 de noviembre de 2026**; YouTube requiere conexión a Internet.
+
+| Orden y video | Canal / duración | Qué estudiar y cómo aplicarlo |
+|---|---|---|
+| 1. [Databricks Bootcamp 2026 — E06: Autoloader de landing a bronze, Structured Streaming](https://www.youtube.com/watch?v=9Mw-S8N_Ukc) | Daniel Datashow · 78 min · español | Descubrimiento incremental de archivos, Auto Loader y su integración con Structured Streaming y Delta Lake. Relaciónalo con la prueba **3 → 5 → 5** y el progreso gestionado por el pipeline. |
+| 2. [Lakeflow Jobs Parte 2: Triggers, Scheduled y File Arrival](https://www.youtube.com/watch?v=mXLtzno4tqo) | EDUCATRONICOS ISC · 14 min · español | Programación periódica de un Job. Después de aprobar la prueba manual, aplica Scheduled con el cron cada 3 minutos de esta guía; File Arrival es una alternativa, no se utiliza en este laboratorio. |
+
+Si necesitas repasar tareas y parámetros, mira [Lakeflow Jobs en Databricks: Tasks, dependencias y parámetros](https://www.youtube.com/watch?v=CggUSoJ3fDQ), de **EDUCATRONICOS ISC** (33 min, español), recomendado también en el reto 1.
+
+**Compatibilidad y seguridad:** Auto Loader con Structured Streaming en un notebook ayuda a entender la ingesta, pero aquí se ejecuta dentro de SDP. Usa `from pyspark import pipelines as dp`, el código de `solucion/pipeline.py`, Unity Catalog y `/Volumes/`. No copies checkpoints manuales, full refresh, credenciales ni datasets externos del video. Conserva el progreso gestionado por el pipeline, el generador dummy, tu sufijo y el límite de 500 registros por ejecución. Una actualización puede procesar varios micro-batches y no deduplica eventos de negocio automáticamente.
+
+**Comprobación de estudio:** explica por qué actualizar sin archivos nuevos mantiene el conteo y por qué un evento repetido en otro archivo es un problema distinto.
+
 ## Referencias
 
 - [Conceptos de pipelines](https://docs.databricks.com/aws/en/ldp/concepts)
