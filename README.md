@@ -80,9 +80,22 @@ SELECT evento_id, persona_id, persona_alias
 FROM retos_sdp_dsh.reto02_dsh.vuelos_bronze_dsh ORDER BY evento_id;
 ```
 
-## Programación opcional
+## Ingesta sintética cada 3 minutos
 
-Después de comprobar **3 → 5 → 5**, crea otro Job `job_programado_reto02_dsh` con el mismo notebook y parámetros del Job `sufijo = dsh`, `lote = continuo`. Cada ejecución genera un evento y archivo nuevos con identificadores ficticios únicos; los conteos de la prueba inicial dejarán de aplicar. Añade una tarea **Pipeline** que dependa de la tarea de ingesta y seleccione `pipeline_reto02_dsh`; usa actualización normal, no full refresh. Configura una programación con concurrencia máxima 1, inicialmente pausada. Actívala solo para la prueba, observa las ejecuciones y vuelve a pausarla. La frecuencia y latencia dependen del entorno y generan costos; reintentar una ejecución puede producir otro evento nuevo.
+Después de comprobar **3 → 5 → 5**:
+
+1. Crea otro Job `job_programado_reto02_dsh` con una tarea **Notebook** llamada `generar_datos` que use `ingesta/generador.py`.
+2. En los **parámetros del Job**, configura `sufijo = dsh`, `lote = continuo` y `registros = 500`. Sustituye el sufijo; no dupliques parámetros en la tarea. `registros` solo aplica a `continuo`, acepta enteros de **1 a 500** y vale 500 por defecto. Un valor inválido hace fallar la tarea antes de escribir.
+3. Añade una tarea **Pipeline** llamada `transformar_datos`, dependiente del **éxito** de `generar_datos`, y selecciona `pipeline_reto02_dsh`. Usa actualización normal, **no full refresh**.
+4. En **Add trigger → Scheduled → Advanced → Show Cron Syntax**, configura la expresión Quartz `0 0/3 * * * ?` y zona horaria `UTC`: minutos 00, 03, 06, etc. Guarda la programación inicialmente **pausada**.
+5. Configura concurrencia máxima **1**, desactiva **Queue** y deja los reintentos automáticos de la tarea generadora en **0**. Si una ejecución dura más de 3 minutos, las siguientes pueden omitirse mientras sigue activa; no se superponen ni se acumulan. No se garantiza una ingesta exactamente cada 3 minutos.
+6. Ejecuta **Run now** para verificar permisos y la cadena Notebook → Pipeline. Después activa la programación, observa algunas ejecuciones y vuelve a **pausarla** al terminar.
+
+Cada ejecución exitosa del generador escribe **un archivo JSON Lines nuevo con 500 eventos** (o la cantidad elegida), sin sobrescribir. Los identificadores de evento, persona y archivo se generan con UUID e índice. Las aeronaves, países y velocidades varían usando solo valores dummy; no hay conexión a fuentes reales. Los lotes fijos `lote_01` y `lote_02` no cambian.
+
+Revisa en la salida del notebook la ruta y el número de eventos, y repite la consulta de conteo. Si completaste la prueba manual y luego ejecutas dos lotes continuos de 500, cada uno seguido de una actualización normal, debes observar **5 → 505 → 1005**. Ejecuta otra actualización del pipeline **sin ejecutar el generador**: el conteo debe mantenerse en 1005. Comprueba que cada `evento_id` aparece una vez. Una actualización puede consumir varios archivos nuevos y uno o varios micro-batches.
+
+El límite de 500 es **por ejecución del generador**, no para el total acumulado en Delta. Los reintentos manuales pueden producir otro lote; no se garantiza deduplicación de negocio. Esta programación aproxima near real-time, sin garantía de latencia: el planificador y el cómputo pueden retrasar ejecuciones y generan costos. Este repositorio no crea ni activa Jobs automáticamente; configura y valida la programación en tu workspace.
 
 ## Entregables y evaluación
 
@@ -102,3 +115,4 @@ No uses full refresh para la prueba: cambia la semántica del experimento. No so
 - [Parámetros de configuración](https://docs.databricks.com/aws/en/ldp/parameters)
 - [Tareas notebook en Jobs](https://docs.databricks.com/aws/en/jobs/tasks/notebook)
 - [Tareas pipeline en Jobs](https://docs.databricks.com/aws/en/jobs/tasks/pipeline)
+- [Programar Jobs](https://docs.databricks.com/aws/en/jobs/scheduled)
