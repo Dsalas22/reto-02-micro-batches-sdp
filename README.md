@@ -5,7 +5,7 @@
 
 ## Objetivo
 
-Comprobar el procesamiento incremental de archivos nuevos con Auto Loader y varias actualizaciones triggered, y ver cómo un modelo **Data Vault** en Plata absorbe duplicados y correcciones: el **hub** conserva la primera carga de cada llave (SCD tipo 1) y el **satélite** guarda la historia de cambios (SCD tipo 2). Las capas son fijas: Bronce `raw_data.bronze`, Plata `data_vault.plata`, Oro `ods.gold`. Una actualización puede procesar uno o varios micro-batches; no se presupone una correspondencia de uno a uno.
+Comprobar el procesamiento incremental de archivos nuevos con Auto Loader y varias actualizaciones triggered, y ver cómo un modelo **Data Vault** en Plata absorbe duplicados y correcciones: el **hub** conserva la primera carga de cada llave (SCD tipo 1) y el **satélite** guarda la historia de cambios (SCD tipo 2). Las capas son fijas: Bronce `raw_data.bronze`, Plata `data_vault.silver`, Oro `ods.gold`. Una actualización puede procesar uno o varios micro-batches; no se presupone una correspondencia de uno a uno.
 
 ## Resultado esperado
 
@@ -25,8 +25,8 @@ Al final, `e4` tiene 2 versiones en el satélite (400 cerrada y 420 vigente) y `
 | Aterrizaje | `/Volumes/raw_data/bronze/landing_retos_sdp/dsh/reto02/entrada` | Carpeta en volumen compartido | Archivos JSON del generador |
 | Bronce | `raw_data.bronze.r02_vuelos_raw_dsh` | Streaming table (Auto Loader) | Todo lo que llega, incluidos duplicados, + `archivo_origen`, `fecha_archivo`, `fecha_ingesta` |
 | Staging | `r02_stg_vuelos_dsh` | Vista temporal privada | Hash key, hashdiff, `fecha_carga`, `fuente_registro` |
-| Plata | `data_vault.plata.r02_hub_vuelo_dsh` | Streaming table con AUTO CDC (SCD1) | Una fila por `evento_id`: la primera carga |
-| Plata | `data_vault.plata.r02_sat_vuelo_dsh` | Streaming table con AUTO CDC (SCD2) | Historia de atributos; `__END_AT` nulo = versión vigente |
+| Plata | `data_vault.silver.r02_hub_vuelo_dsh` | Streaming table con AUTO CDC (SCD1) | Una fila por `evento_id`: la primera carga |
+| Plata | `data_vault.silver.r02_sat_vuelo_dsh` | Streaming table con AUTO CDC (SCD2) | Historia de atributos; `__END_AT` nulo = versión vigente |
 | Oro | `ods.gold.r02_vuelos_por_aeronave_dsh` | Vista materializada | Eventos y velocidad promedio por aeronave, solo versiones vigentes |
 
 ## Data Vault en pocas palabras
@@ -46,7 +46,7 @@ Al final, `e4` tiene 2 versiones en el satélite (400 cerrada y 420 vigente) y `
 
 ## Preparación del instructor (una vez)
 
-Los catálogos `raw_data`, `data_vault` y `ods` y los esquemas `raw_data.bronze`, `data_vault.plata` y `ods.gold` ya existen. El instructor crea el volumen compartido y otorga los permisos una sola vez; sirven para los tres retos. Sustituye `participantes` por el grupo de participantes (recomendado) o por un correo:
+Los catálogos `raw_data`, `data_vault` y `ods` y los esquemas `raw_data.bronze`, `data_vault.silver` y `ods.gold` ya existen. El instructor crea el volumen compartido y otorga los permisos una sola vez; sirven para los tres retos. Sustituye `participantes` por el grupo de participantes (recomendado) o por un correo:
 
 ```sql
 CREATE VOLUME IF NOT EXISTS raw_data.bronze.landing_retos_sdp;
@@ -56,7 +56,7 @@ GRANT USE CATALOG ON CATALOG data_vault TO `participantes`;
 GRANT USE CATALOG ON CATALOG ods        TO `participantes`;
 
 GRANT USE SCHEMA, CREATE TABLE, SELECT ON SCHEMA raw_data.bronze  TO `participantes`;
-GRANT USE SCHEMA, CREATE TABLE, SELECT ON SCHEMA data_vault.plata TO `participantes`;
+GRANT USE SCHEMA, CREATE TABLE, SELECT ON SCHEMA data_vault.silver TO `participantes`;
 GRANT USE SCHEMA, CREATE MATERIALIZED VIEW, SELECT ON SCHEMA ods.gold TO `participantes`;
 
 GRANT READ VOLUME, WRITE VOLUME ON VOLUME raw_data.bronze.landing_retos_sdp TO `participantes`;
@@ -87,7 +87,7 @@ Los archivos de `datos/` son muestras de referencia equivalentes; no los subas s
 
 1. **Primer lote.** Ejecuta el Job manual con `lote = lote_01`. La salida debe decir `Lote lote_01: 3 eventos escritos en /Volumes/raw_data/bronze/landing_retos_sdp/dsh/reto02/entrada/lote_01.json`. No ejecutes aún `lote_02`.
 
-2. **Crea el pipeline.** Crea un archivo Python en el workspace con `solucion/pipeline.py` y agrégalo como código fuente a un nuevo pipeline llamado `pipeline_reto02_dsh`. Destino por defecto: catálogo `raw_data`, esquema `bronze`; modo **triggered**. Plata y Oro se publican en `data_vault.plata` y `ods.gold` porque el código usa el nombre completo de cada tabla. En **Settings → Configuration** agrega solo `pipelines.suffix = dsh`; el código rechaza un sufijo ausente o que no tenga exactamente tres letras. Las claves opcionales `raw_catalog`, `raw_schema`, `silver_catalog`, `silver_schema`, `gold_catalog`, `gold_schema` y `landing_volume` ya tienen como valores por defecto `raw_data`, `bronze`, `data_vault`, `plata`, `ods`, `gold` y `landing_retos_sdp`.
+2. **Crea el pipeline.** Crea un archivo Python en el workspace con `solucion/pipeline.py` y agrégalo como código fuente a un nuevo pipeline llamado `pipeline_reto02_dsh`. Destino por defecto: catálogo `raw_data`, esquema `bronze`; modo **triggered**. Plata y Oro se publican en `data_vault.silver` y `ods.gold` porque el código usa el nombre completo de cada tabla. En **Settings → Configuration** agrega solo `pipelines.suffix = dsh`; el código rechaza un sufijo ausente o que no tenga exactamente tres letras. Las claves opcionales `raw_catalog`, `raw_schema`, `silver_catalog`, `silver_schema`, `gold_catalog`, `gold_schema` y `landing_volume` ya tienen como valores por defecto `raw_data`, `bronze`, `data_vault`, `silver`, `ods`, `gold` y `landing_retos_sdp`.
 
 3. **Primera actualización.** Ejecuta una actualización normal y espera su finalización. Ejecuta la validación SQL de abajo: Bronce 3, hub 3, satélite 3.
 
@@ -105,9 +105,9 @@ Los archivos de `datos/` son muestras de referencia equivalentes; no los subas s
 -- Conteos por capa (repite después de cada actualización)
 SELECT
   (SELECT COUNT(*) FROM raw_data.bronze.r02_vuelos_raw_dsh)  AS bronce,
-  (SELECT COUNT(*) FROM data_vault.plata.r02_hub_vuelo_dsh)  AS hub,
-  (SELECT COUNT(*) FROM data_vault.plata.r02_sat_vuelo_dsh)  AS sat_filas,
-  (SELECT COUNT(*) FROM data_vault.plata.r02_sat_vuelo_dsh WHERE __END_AT IS NULL) AS sat_vigentes;
+  (SELECT COUNT(*) FROM data_vault.silver.r02_hub_vuelo_dsh)  AS hub,
+  (SELECT COUNT(*) FROM data_vault.silver.r02_sat_vuelo_dsh)  AS sat_filas,
+  (SELECT COUNT(*) FROM data_vault.silver.r02_sat_vuelo_dsh WHERE __END_AT IS NULL) AS sat_vigentes;
 
 -- Cuántas veces llegó cada evento a Bronce
 SELECT evento_id, COUNT(*) AS veces
@@ -116,13 +116,13 @@ GROUP BY evento_id ORDER BY evento_id;
 
 -- Historia del satélite unida al hub
 SELECT h.evento_id, s.velocidad_kmh, s.hashdiff, s.__START_AT, s.__END_AT
-FROM data_vault.plata.r02_hub_vuelo_dsh h
-JOIN data_vault.plata.r02_sat_vuelo_dsh s USING (hk_vuelo)
+FROM data_vault.silver.r02_hub_vuelo_dsh h
+JOIN data_vault.silver.r02_sat_vuelo_dsh s USING (hk_vuelo)
 ORDER BY h.evento_id, s.__START_AT;
 
 -- El hub conserva la primera carga
 SELECT evento_id, fecha_carga, fuente_registro
-FROM data_vault.plata.r02_hub_vuelo_dsh ORDER BY evento_id;
+FROM data_vault.silver.r02_hub_vuelo_dsh ORDER BY evento_id;
 
 -- Oro: versiones vigentes por aeronave
 SELECT * FROM ods.gold.r02_vuelos_por_aeronave_dsh ORDER BY aeronave_id;
